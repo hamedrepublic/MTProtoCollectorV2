@@ -7,51 +7,85 @@ function getProxies($channel)
 {
     $all_proxies = [];
 
-    // مرحله اول: گرفتن پراکسی از صفحه‌ی اصلی کانال
-    $main_page = file_get_contents("https://t.me/s/" . $channel);
+    // دریافت HTML صفحه اصلی کانال
+    $main_page = @file_get_contents("https://t.me/s/" . $channel);
+    if (!$main_page) return [];
 
-    // گرفتن لینک‌های پراکسی
-    preg_match_all('#href="(.*?)/proxy\?(.*?)" target="_blank"#', $main_page, $matches1);
-    preg_match_all('#class="tgme_widget_message_inline_button url_button" href="(.*?)/proxy\?(.*?)"#', $main_page, $matches2);
-
-    // اضافه کردن پراکسی‌های صفحه اصلی
-    if (!empty($matches1[0])) {
-        foreach ($matches1[0] as $m) {
-            $all_proxies[] = urldecode($m);
-        }
-    }
-    if (!empty($matches2[0])) {
-        foreach ($matches2[0] as $m) {
-            $all_proxies[] = urldecode($m);
-        }
+    // استخراج لینک‌های پراکسی از صفحه اصلی
+    preg_match_all('#href="(.*?)/proxy\?(.*?)"#', $main_page, $matches_main);
+    foreach ($matches_main[0] as $m) {
+        $all_proxies[] = html_entity_decode($m);
     }
 
-    // مرحله دوم: پیدا کردن لینک پست‌هایی که مربوط به topic هستند
-    preg_match_all('/href="\/' . $channel . '\/(\d+)"/', $main_page, $post_ids);
-
+    // استخراج آیدی پست‌های موضوع‌بندی شده (topic posts)
+    preg_match_all('/href="\/' . preg_quote($channel, '/') . '\/(\d+)"/', $main_page, $post_ids);
     $unique_ids = array_unique($post_ids[1]);
 
+    // بررسی هر پست دسته‌بندی‌شده
     foreach ($unique_ids as $id) {
-        // بارگذاری هر پست دسته‌بندی شده
         $topic_page = @file_get_contents("https://t.me/s/$channel/$id");
         if (!$topic_page) continue;
 
-        preg_match_all('#href="(.*?)/proxy\?(.*?)" target="_blank"#', $topic_page, $topic_matches1);
-        preg_match_all('#class="tgme_widget_message_inline_button url_button" href="(.*?)/proxy\?(.*?)"#', $topic_page, $topic_matches2);
-
-        foreach ($topic_matches1[0] as $m) {
-            $all_proxies[] = urldecode($m);
-        }
-        foreach ($topic_matches2[0] as $m) {
-            $all_proxies[] = urldecode($m);
+        preg_match_all('#href="(.*?)/proxy\?(.*?)"#', $topic_page, $matches_topic);
+        foreach ($matches_topic[0] as $m) {
+            $all_proxies[] = html_entity_decode($m);
         }
     }
 
-    // حذف تکراری‌ها و مرتب‌سازی
-    $all_proxies = array_unique($all_proxies);
-    sort($all_proxies);
+    return array_unique($all_proxies);
+}
 
-    return $all_proxies;
+function proxy_array_maker($source)
+{
+    $proxies = getProxies($source);
+    $result = [];
+
+    foreach ($proxies as $proxy) {
+        $parsed = parse_proxy($proxy, $source);
+        if (!empty($parsed)) {
+            $result[] = $parsed;
+        }
+    }
+
+    return $result;
+}
+
+function remove_duplicate($array)
+{
+    $serialized = array_map('serialize', $array);
+    $unique = array_unique($serialized);
+    return array_map('unserialize', $unique);
+}
+
+function parse_proxy($proxy, $name)
+{
+    $proxy_array = [];
+    $url = html_entity_decode($proxy);
+    $parts = parse_url($url);
+
+    if (!isset($parts['query'])) return [];
+
+    $query_string = str_replace("amp;", "", $parts["query"]);
+    parse_str($query_string, $query_params);
+
+    if (!isset($query_params['server'])) return [];
+
+    $server = $query_params['server'];
+
+    // فیلتر کردن دامنه‌ها و IPهای نامعتبر
+    if (filtered_or_not("https://" . $server)) return [];
+
+    // بررسی موقعیت جغرافیایی
+    $ip_data = function_exists("ip_info") ? ip_info($server) : null;
+    $flag = isset($ip_data["country"]) ? (function_exists("getFlags") ? getFlags($ip_data["country"]) : "🏳️") : "🚩";
+
+    $query_params["name"] = "@" . $name . "|" . $flag;
+
+    $proxy_array = $parts;
+    unset($proxy_array["query"]);
+    $proxy_array["query"] = $query_params;
+
+    return $proxy_array;
 }
 
 ?>
