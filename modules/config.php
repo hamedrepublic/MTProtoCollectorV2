@@ -20,6 +20,12 @@ $sources = [
     'proxyhubs',
     'ProxyDaemi',
     'proxyme',
+    'frrenett',
+    'proxytelegram',
+    'we2wayanon',
+    'c/1796213998/108613',
+    'vpnv2r4y',
+    'proxyme',
     'Melli_Config'
     ];
 
