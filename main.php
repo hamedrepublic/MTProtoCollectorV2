@@ -1,9 +1,9 @@
 <?php
-include "modules/config.php";           // تعریف $sources
-include "modules/get_proxy.php";        // توابع getProxies و proxy_array_maker
-include "modules/ping.php";             // احتمالاً تابع ping
-include "modules/ipinfo.php";           // اطلاعات آی‌پی
-include "modules/flag.php";             // تابع getFlags
+include_once "modules/config.php";
+include_once "modules/get_proxy.php";
+include_once "modules/ping.php";
+include_once "modules/ipinfo.php";
+include_once "modules/flag.php";
 
 $final_data = [];
 foreach ($sources as $source) {
